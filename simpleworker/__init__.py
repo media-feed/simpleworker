@@ -1,7 +1,7 @@
 import os
 
 from json import dumps, loads
-from threading import Condition, Thread
+from threading import Condition, Event, Thread
 from time import sleep
 
 
@@ -129,13 +129,15 @@ class Worker(object):
 
 
 class WorkerManager(object):
-    def __init__(self, path, name='simpleworker'):
+    def __init__(self, path, name='simpleworker', time=30):
         self._path = path
         self.name = name
+        self.time = time
         self._running = False
         self._lock = Condition()
         self._workers = {}
         self._thread = None
+        self._run_event = Event()
 
         os.makedirs(self._path, exist_ok=True)
 
@@ -158,14 +160,23 @@ class WorkerManager(object):
                 worker.signal_to_stop()
             for worker in self._workers.values():
                 worker.wait_jobs()
+        self._run_event.set()
         self._thread.join()
 
     def _run(self):
+        def timer():
+            while self._running:
+                sleep(self.time)
+                self._run_event.set()
+
+        Thread(target=timer, daemon=True).start()
+
         while self._running:
             with self._lock:
                 for worker in self._workers.values():
                     worker.check()
-            sleep(30)
+            self._run_event.wait()
+            self._run_event.clear()
 
     def _add_worker(self, name, num_workers, function):
         self._workers[name] = Worker(name, num_workers, function, os.path.join(self._path, name))
