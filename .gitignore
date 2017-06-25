@@ -1,0 +1,9 @@
+# Envs
+/env/
+/venv/
+
+# Python
+*.py[cod]
+__pycache__/
+/build/
+/*.egg-info/
